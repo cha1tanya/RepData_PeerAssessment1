@@ -1,25 +1,94 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: 'Reproducible Research: Peer Assessment 1'
+author: "Chaitanya R"
+date: "November 22, 2017"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+# Options valid for the entire document
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ## Loading and preprocessing the data
 
+The data from the URL given in the assignment is first downloaded and unzipped. It is then read into a R data frame:
 
+```{r LoadData, cache=TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip","./activity.zip")
+unzip("./activity.zip")
+#read the dataset into a R data frame
+activity <- read.csv("./activity.csv")
+#check summary to ensure the read was proper
+summary(activity)
+#Looks like the format of "date" is not date. Format the "date" column
+activity$date <- as.Date(activity$date)
+```
 
 ## What is mean total number of steps taken per day?
 
+Total number of steps taken per day is computed used the *aggregate* function. Then, a histogram is shown.
 
+```{r TotalStepsPerDay}
+# Calculate the total number of steps taken per day
+StepsPerDay <- aggregate(steps ~ date, activity, sum)
+# Make a histogram of the total number of steps taken each day
+hist(StepsPerDay$steps,main = "Total number of steps taken each day",xlab = "Steps")
+# Calculate and report the mean and median of the total number of steps taken per day
+mean(StepsPerDay$steps)
+median(StepsPerDay$steps)
+```
 
 ## What is the average daily activity pattern?
 
+Average number of steps taken per day is also computed used the *aggregate* function. Then, a time series plot is shown.
 
+```{r MeanStepsPerInt}
+StepsPerInt <- aggregate(steps ~ interval, activity, mean)
+colnames(StepsPerInt)[2] <- "AvgSteps"
+# Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+plot(StepsPerInt$interval,StepsPerInt$AvgSteps,type="l", xlab="Interval", ylab = "Average Steps")
+# Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+StepsPerInt[StepsPerInt$AvgSteps == max(StepsPerInt$AvgSteps),1]
+```
+
+People walk the most at around 08:35 AM! What could be the reason? Going to office?
 
 ## Imputing missing values
 
+If there are missing values in the data, we might want to impute them for further analysis. For imputing the missing values, we could make use of the average steps computed in the previous step. But first, let's check the number of rows with at least one missing value.
+
+```{r MissingValImp}
+# Calculate and report the total number of missing values in the dataset
+sum(1-complete.cases(activity))
+# A strategy for filling in all of the missing values in the dataset:
+# Merge the data with the average steps per interval dataset, and replace the missing "steps" with "AvgSteps"
+activity2 <- merge(activity,StepsPerInt)
+activity2$steps <- ifelse(is.na(activity2$steps),activity2$AvgSteps,activity2$steps)
+
+# Make a histogram of the total number of steps taken each day
+StepsPerDay2 <- aggregate(steps ~ date, activity2, sum)
+hist(StepsPerDay2$steps,main = "Total number of steps taken each day",xlab = "Steps (Imputed)")
+# Calculate and report the mean and median total number of steps taken per day
+mean(StepsPerDay2$steps)
+median(StepsPerDay2$steps)
+```
+
+Since average value is used in imputation, the mean has not changed. Median slightly moved towards the mean.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Let us analyse if there are differences in activity patterns between weekdays and weekends. Let's create a new factor variable in the dataset with two levels -- "weekday" and "weekend" indicating whether a given date is a weekday or weekend day frist.
+
+```{r Weekday}
+# Create a new factor variable in the dataset with two levels -- "weekday" and "weekend" 
+activity2$weekday <- ifelse(weekdays(activity2$date) %in% c("Saturday","Sunday"),"weekend","weekday")
+# Compute the average number of steps taken, averaged across all weekday days or weekend days
+StepsPerInt2 <- aggregate(steps ~ interval + weekday, activity2, mean)
+# Make a panel plot containing a time series plot
+library(lattice)
+xyplot(steps ~ interval | weekday, data=StepsPerInt2, type = "l",layout=c(1,2))
+```
+
+As expected, people walk more during the middle of the day in the weekends than they do on the weekdays.
